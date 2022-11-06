@@ -1505,7 +1505,21 @@ public class SyntaxAnalyzer{
         {
             index++;
             if ( P4() ){
-                return true;
+                if ( P5()){
+                    return true;
+                }
+            }
+        }
+
+        // Pre Inc
+        else if ( tokens.get(index).CP.equals("IncDec") )
+        {
+            if ( PRE_INC() )
+            {
+                if ( P5() )
+                {
+                    return true;
+                }
             }
         }
 
@@ -1520,7 +1534,14 @@ public class SyntaxAnalyzer{
 
     // P4
     public boolean P4(){
-        if (tokens.get(index).CP.equals("AsgnOp"))
+        
+        if ( tokens.get(index).CP.equals("IncDec") )
+        {
+            index++;
+            return true;
+        }
+        
+        else if (tokens.get(index).CP.equals("AsgnOp"))
         {
             index++;
             if ( OE() ){
@@ -1535,14 +1556,40 @@ public class SyntaxAnalyzer{
             }
         }
 
-        // Null
-        else if (tokens.get(index).CP.equals("IncDec") ){
-            index++;
-            return true;
-        }
         return false;
     }
 
+    // P5
+    public boolean P5()
+    {
+        if ( tokens.get(index).CP.equals("comma") ){
+            index++;
+            if ( tokens.get(index).CP.equals("ID") )
+            {
+                index++;
+                if ( P4() ){
+                    return true;
+                }
+            }
+        }
+
+        else if ( tokens.get(index).CP.equals("comma") ){
+            index++;
+            if ( PRE_INC() )
+            {
+                return true;
+            }
+        }
+
+        // Null
+        else{
+            if ( tokens.get(index).CP.equals("rp") ){
+                return true;
+            }
+        }
+
+        return false;
+    }
 
 
     // -------------------------------------------------- Expression --------------------------------------------------------------
