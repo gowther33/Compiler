@@ -4,16 +4,16 @@ import java.util.Stack;
 public class SemanticAnalyzer {
 
     SemanticAnalyzer(){};
-    ArrayList<MainTable> MainTable = new ArrayList<MainTable>();
-    ArrayList<FunctionTable> functable = new ArrayList<FunctionTable>();
+    ArrayList<MainTable> MT = new ArrayList<MainTable>();
+    ArrayList<FunctionTable> FT = new ArrayList<FunctionTable>();
     public int scopenum = 0;
     Stack<Integer> currentscope = new Stack<Integer>();
     public static void main(String[] args) {
         // ArrayList<String> p1 = new ArrayList<>();
-        SemanticAnalyzer sa = new SemanticAnalyzer();
-        System.out.println(sa.insertMT("A", "Class", null, null));
-        System.out.println(sa.insertMT("B", "Class", "final", null));
-        System.out.println(sa.insertMT("B", "Class", "abstract", null));
+        // SemanticAnalyzer sa = new SemanticAnalyzer();
+        // System.out.println(sa.insertMT("A", "Class", null, null));
+        // System.out.println(sa.insertMT("B", "Class", "final", null));
+        // System.out.println(sa.insertMT("B", "Class", "abstract", null));
     }
 
     boolean insertMT(String name, String type, String CM, ArrayList<String> parent)
@@ -28,29 +28,29 @@ public class SemanticAnalyzer {
         else
         {
             MainTable m = new MainTable(name, type, CM, parent);
-            MainTable.add(m);
+            MT.add(m);
             return true;
         }
     }
 
     MainTable lookupMT(String name)
     {
-        for (int i = 0; i < MainTable.size(); i++) 
+        for (int i = 0; i < MT.size(); i++) 
         {
-            if (MainTable.get(i).name.equals(name)) 
+            if (MT.get(i).name.equals(name)) 
             {
-                return MainTable.get(i);
+                return MT.get(i);
             }
         }
         return null;
     }
 
-    boolean insertCT(String name, String type, String AM, boolean Fin, String TM, String ClassName, String ABS)
+    boolean insertCT(String name, String type, String AM, boolean Fin, Boolean Static, String ClassName, boolean ABS)
     {
-        ClassTable c = new ClassTable(name, type, AM, Fin, TM, ABS);
-        for (int i = 0; i < MainTable.size(); i++) 
+        ClassTable c = new ClassTable(name, type, AM, Fin, Static, ABS);
+        for (int i = 0; i < MT.size(); i++) 
         {
-            MainTable m = MainTable.get(i);
+            MainTable m = MT.get(i);
             if (m.name.equals(ClassName)) 
             {
                 m.CT.add(c);
@@ -62,9 +62,9 @@ public class SemanticAnalyzer {
     // Class Lookup for Attributes
     ClassTable LookupCTa(String Name, String ClassName)
     {
-        for (int i = 0; i < MainTable.size(); i++) 
+        for (int i = 0; i < MT.size(); i++) 
         {
-            MainTable m = MainTable.get(i);
+            MainTable m = MT.get(i);
             if (m.name.equals(ClassName)) 
             {
                 for (int j = 0; j < m.CT.size(); j++) 
@@ -83,9 +83,9 @@ public class SemanticAnalyzer {
     // Class Lookup for Functions
     ClassTable LookupCTf(String Name, String PL, String ClassName)
     {
-        for (int i = 0; i < MainTable.size(); i++) 
+        for (int i = 0; i < MT.size(); i++) 
         {
-            MainTable m = MainTable.get(i);
+            MainTable m = MT.get(i);
             if (m.name.equals(ClassName)) 
             {
                 for (int j = 0; j < m.CT.size(); j++) 
@@ -107,13 +107,13 @@ public class SemanticAnalyzer {
     boolean insertFT(String name, String type, int scope)
     {
     
-            for (FunctionTable item : functable) {
+            for (FunctionTable item : FT) {
                 if (item.name.equals(name) && item.scope == scope) {
                     return false;
                 }
             }
     
-            functable.add(new FunctionTable(name, type, scope));
+            FT.add(new FunctionTable(name, type, scope));
             System.out.println(name + " " + type + " " + scope);
             return true;
     }
@@ -121,11 +121,11 @@ public class SemanticAnalyzer {
 
     FunctionTable lookupFT(String name,int scope)
     {
-        for (int i = 0; i < functable.size(); i++) 
+        for (int i = 0; i < FT.size(); i++) 
         {
-            if (functable.get(i).name.equals(name) && functable.get(i).scope == scope) 
+            if (FT.get(i).name.equals(name) && FT.get(i).scope == scope) 
             {
-                return functable.get(i);
+                return FT.get(i);
             }
         }return null;
     }
@@ -146,36 +146,37 @@ public class SemanticAnalyzer {
 class MainTable
 {
     String name = null;
-    String type = null;
-    String CM = null;
-    ArrayList<String> parent = new ArrayList<String>();
-    ArrayList<ClassTable> CT = new ArrayList<ClassTable>(); // Class Table reference
+    String type = null; // Class, ID, Function
+    String CM = null; // Class Modifier
+    ArrayList<String> parent;
+    ArrayList<ClassTable> CT; // Class Table reference
     // int link = CT.hashCode();
 
     public MainTable(String name, String type, String CM, ArrayList<String> parent)
     {
         this.name = name; // Name of Function, Identifier, Class
         this.type = type; 
-        this.CM = CM; // Class Modifiers (abstract, final)
+        this.CM = CM; // Class Modifiers (hide, const)
         this.parent = parent; // Inheritance for class
+        this.CT = new ArrayList<ClassTable>();
     }
 }
 
 class ClassTable
 {
     String name = null;
-    String type = null;
+    String type = null; // Data type and functions paramters type
     String AM = null;
     boolean Final = false;
-    String TM = null; // Static
-    String ABS = null; // Abstract
+    boolean Static = false; // Static
+    boolean ABS = false; // Abstract
 
-    public ClassTable(String name, String type, String AM, boolean Final, String TM, String ABS)
+    public ClassTable(String name, String type, String AM, boolean Final, Boolean Static, boolean ABS)
     {
         this.name = name;
         this.type = type;
         this.AM = AM;
-        this.TM = TM;
+        this.Static = Static;
         this.Final = Final;
         this.ABS = ABS;
     }

@@ -1,2 +1,2 @@
-if ( a > b & b < c )
-{;}
+iterate (int a, b ~ 0; a < 5 & b < 6; a++, b++)
+{}

@@ -697,7 +697,7 @@ public class LexicalAnalyzer {
 						flag = true;
 						continue;
 					}
-					// For #
+					// For #, $
 					tokenList.add(new Token("AM", Character.toString(ch), lineNo));
 					continue;
 				}

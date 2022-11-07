@@ -2,11 +2,22 @@
 import java.util.ArrayList;
 // Error in Dec Init List
 
-
 public class SyntaxAnalyzer{
 
-    public int index = 0;
-    public ArrayList<Token> tokens;
+    private int index = 0;
+    private ArrayList<Token> tokens;
+
+    // Semantic Identifiers
+    String type = null; // Entities: Class, IDF, Function
+    String name = null; // Name for the entity
+    String CM = null; // Clas Modifier ( hide, const)
+    String AM = null; // Access Modifier for Attributes and class methods
+    String Classname = null; 
+    ArrayList<String> parent;
+    int index2 = 0; // This index keeps track of Main table entries
+
+    // Semantic Object
+    SemanticAnalyzer SMA = new SemanticAnalyzer();
 
     public static void main(String[] args) {
         LexicalAnalyzer LA = new LexicalAnalyzer();
@@ -58,21 +69,38 @@ public class SyntaxAnalyzer{
     // Class
     public boolean Class(){
         if ( tokens.get(index).CP.equals("class") || tokens.get(index).CP.equals("hide") || tokens.get(index).CP.equals("final") )
-        {   // Only one rule
-            if (C_Type()){
+        {   // Synthesized Attribute
+            // Class Modifier: hide, const
+            if (C_Type(CM)){
                 if (tokens.get(index).CP.equals("class")){
                     // Reading terminal increments index
+                    type = "Class";
                     index++;
                     if (tokens.get(index).CP.equals("ID")){
+                        // Name of class from value part
+                        name = tokens.get(index).value;
                         // Reading terminal increments index
                         index++;
-                        if (Inherit()){
+                        // The ID parent will be initialized with a new object reference everytime this method is called
+                        parent = new ArrayList<>();
+                        if (Inherit(parent)){
+                            // Enter into main table
+                            if ( ! SMA.insertMT(name, type, CM, parent) )
+                            {
+                                System.out.println("Duplicate Class Error!");
+                            }
+
                             if (tokens.get(index).CP.equals("lcb")){
                                 // Reading terminal increments index
+                                SMA.createScope();
                                 index++;
-                                if (C_Body()){
+                                // Class body will inherit Class table reference
+                                if (C_Body(SMA.MT.get(index2).CT)){
+                                    // Index2 is incremented after each entry in the main table
+                                    index2++;
                                     if (tokens.get(index).CP.equals("rcb")){
                                         // Reading terminal increments index
+                                        SMA.destroyScope();
                                         index++;
                                         return true;
                                     }
@@ -89,11 +117,12 @@ public class SyntaxAnalyzer{
     }
 
     // Class Types
-    public boolean C_Type(){
+    public boolean C_Type(String CM){
         // Rule 1
         if ( tokens.get(index).CP.equals("hide"))
         {
-            // Terminal
+            // Put value part in the attribute
+            CM = tokens.get(index).value;
             index++;
             return true;
         }
@@ -101,7 +130,8 @@ public class SyntaxAnalyzer{
         // Rule 2
         else if ( tokens.get(index).CP.equals("const") ) 
         {
-            // Terminal
+            // Put value part in the attribute
+            CM = tokens.get(index).value;
             index++;
             return true;
         }
@@ -115,15 +145,38 @@ public class SyntaxAnalyzer{
     }
 
     // Inheritance
-    public boolean Inherit(){
+    public boolean Inherit(ArrayList<String> parent){
         // Rule 1
         if ( tokens.get(index).CP.equals("INH") )
         {
             index++;
             if (tokens.get(index).CP.equals("ID"))
             {
+                name = tokens.get(index).value;
                 index++;
-                if (ILIST())
+                // Lookup in main table if the inherited class exists
+                MainTable T = SMA.lookupMT(name); // returns maintable object
+                // If Identifier
+                if ( T.type.equals("IDF") )
+                {
+                    System.out.println("Cannot inherit from an identifier!");
+                    return false;
+                }
+                // If function
+                else if ( T.type.equals("Function") )
+                {
+                    System.out.println("Cannot inherit from a Function!");
+                    return false;
+                }
+                // If final class
+                else if ( T.type.equals("Class") && T.CM.equals("const"))
+                {
+                    System.out.println("Final class cannot be inherited!");
+                    return false;
+                }
+                parent.add(name);
+                // If multiple inheritance
+                if (ILIST(parent))
                 {
                     return true;
                 }
@@ -137,15 +190,38 @@ public class SyntaxAnalyzer{
     }
 
     // Ilist
-    public boolean ILIST(){
+    public boolean ILIST(ArrayList<String> parent){
         // Rule 1
         if ( tokens.get(index).CP.equals("comma") )
         {
             index++;
             if ( tokens.get(index).CP.equals("ID") )
             {
+                name = tokens.get(index).value;
                 index++;
-                if (ILIST()) 
+                // Lookup in main table if the inherited class exists
+                MainTable T = SMA.lookupMT(name); // returns maintable object
+                // If Identifier
+                if ( T.type.equals("IDF") )
+                {
+                    System.out.println("Cannot inherit from an identifier!");
+                    return false;
+                }
+                // If function
+                else if ( T.type.equals("Function") )
+                {
+                    System.out.println("Cannot inherit from a Function!");
+                    return false;
+                }
+                // If final class
+                else if ( T.type.equals("Class") && T.CM.equals("const"))
+                {
+                    System.out.println("Final class cannot be inherited!");
+                    return false;
+                }
+                parent.add(name);
+                // If more inheritance
+                if (ILIST(parent)) 
                 {
                     return true;
                 }
@@ -159,19 +235,19 @@ public class SyntaxAnalyzer{
     }
 
     // Class Body
-    public boolean C_Body(){
+    public boolean C_Body(ArrayList<ClassTable> CT){
         // Rule 1
         if ( tokens.get(index).CP.equals("func") ){
-            if (C_Func()){
-                if ( C_Body() ) {
+            if (C_Func(CT)){
+                if ( C_Body(CT) ) {
                     return true;
                 }
             }
         }
         // Rule 2
         else if ( tokens.get(index).CP.equals("AM") ){
-            if (ATR()){
-                if ( C_Body() ){
+            if (ATR(CT)){
+                if ( C_Body(CT) ){
                     return true;
                 }
             }
@@ -208,6 +284,22 @@ public class SyntaxAnalyzer{
     public boolean AM(){
         if ( tokens.get(index).CP.equals("AM") ) 
         {
+            AM = tokens.get(index).value;
+            // If public
+            if ( AM.equals("$") )
+            {
+                AM = "Public";
+            }
+            // Private
+            else if ( AM.equals("#") )
+            {
+                AM = "Private";
+            }
+            // Protected
+            else if ( AM.equals("##") )
+            {
+                AM = "Protected";
+            }
             index++;
             return true;
         }
@@ -387,7 +479,7 @@ public class SyntaxAnalyzer{
     }
     
     // Attributes
-    public boolean ATR(){
+    public boolean ATR(ArrayList<ClassTable> CT){
         if ( tokens.get(index).CP.equals("AM") )
         {
             if ( AM() ){
@@ -1453,6 +1545,15 @@ public class SyntaxAnalyzer{
                 }
             }
         }
+
+        // ,ID
+        if ( tokens.get(index).CP.equals("comma") )
+        {
+            if ( U() )
+            {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -2475,12 +2576,12 @@ public class SyntaxAnalyzer{
     // Body 2
     public boolean Body2()
     {
-        // MST
+        // FS(MST) + F(MST)
         if ( tokens.get(index).CP.equals("DT") || tokens.get(index).CP.equals("ID") || tokens.get(index).CP.equals("if") || 
         tokens.get(index).CP.equals("for") || tokens.get(index).CP.equals("while" ) || tokens.get(index).CP.equals("func" ) || 
         tokens.get(index).CP.equals("try") || tokens.get(index).CP.equals("return") || tokens.get(index).CP.equals("break") || 
         tokens.get(index).CP.equals("continue") || tokens.get(index).CP.equals("IncDec") || tokens.get(index).CP.equals("my") ||
-        tokens.get(index).CP.equals("base") )
+        tokens.get(index).CP.equals("base") || tokens.get(index).CP.equals("rcb") )
         {
             if ( MST() )
             {
