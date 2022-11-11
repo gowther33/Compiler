@@ -1,20 +1,34 @@
 // Every rule has selection set
 import java.util.ArrayList;
 // Error in Dec Init List
+import java.util.function.Function;
 
 public class SyntaxAnalyzer{
 
     private int index = 0;
-    private ArrayList<Token> tokens;
+    public ArrayList<Token> tokens;
+    public boolean Semantic = false;
 
     // Semantic Identifiers
     String type = null; // Entities: Class, IDF, Function
     String name = null; // Name for the entity
     String CM = null; // Clas Modifier ( hide, const)
     String AM = null; // Access Modifier for Attributes and class methods
-    String Classname = null; 
+    String DT = null; // Data type for variables
+    String Classname = null; // Classname
+    boolean Final = false;
+    boolean Static = false;
+    boolean ABS = false;
     ArrayList<String> parent;
+
     int index2 = 0; // This index keeps track of Main table entries
+    boolean Class = false; // This flag keeps track of whether insertion in MT is for OOP or General
+    
+    // Whenever there is local entry global = false
+    // After insertion global = true
+    boolean global = true; // This keeps track of global and local declarations
+    boolean function = false; // This flag is for insertion in function table
+
 
     // Semantic Object
     SemanticAnalyzer SMA = new SemanticAnalyzer();
@@ -61,6 +75,7 @@ public class SyntaxAnalyzer{
         else if ( tokens.get(index).CP.equals("?")){
             return true;
         }
+        // Logic for differentiating syntax and semantic errors
         System.out.println("Syntax Error at line "+tokens.get(index).lineNo);
         return false;
     }
@@ -79,25 +94,34 @@ public class SyntaxAnalyzer{
                     if (tokens.get(index).CP.equals("ID")){
                         // Name of class from value part
                         name = tokens.get(index).value;
+                        Classname = name; // To keep track of classname
                         // Reading terminal increments index
                         index++;
                         // The ID parent will be initialized with a new object reference everytime this method is called
                         parent = new ArrayList<>();
                         if (Inherit(parent)){
                             // Enter into main table
-                            if ( ! SMA.insertMT(name, type, CM, parent) )
+                            Class = true; // Insertion is for Class
+                            if ( ! SMA.insertMT(name, type, CM, parent, Class) )
                             {
-                                System.out.println("Duplicate Class Error!");
+                                System.out.println("Duplicate Class "+Classname+" Error!");
+                                Semantic = true;
+                                return false;
                             }
-
+                            // Restore values after insertion
+                            name = null;
+                            type = null;
+                            CM = null;
+                            parent = null;
+                            Class = false; 
                             if (tokens.get(index).CP.equals("lcb")){
                                 // Reading terminal increments index
                                 SMA.createScope();
                                 index++;
                                 // Class body will inherit Class table reference
-                                if (C_Body(SMA.MT.get(index2).CT)){
+                                if (C_Body()){
                                     // Index2 is incremented after each entry in the main table
-                                    index2++;
+                                    // index2++;
                                     if (tokens.get(index).CP.equals("rcb")){
                                         // Reading terminal increments index
                                         SMA.destroyScope();
@@ -160,18 +184,21 @@ public class SyntaxAnalyzer{
                 if ( T.type.equals("IDF") )
                 {
                     System.out.println("Cannot inherit from an identifier!");
+                    Semantic = true;
                     return false;
                 }
                 // If function
                 else if ( T.type.equals("Function") )
                 {
                     System.out.println("Cannot inherit from a Function!");
+                    Semantic = true;
                     return false;
                 }
                 // If final class
                 else if ( T.type.equals("Class") && T.CM.equals("const"))
                 {
                     System.out.println("Final class cannot be inherited!");
+                    Semantic = true;
                     return false;
                 }
                 parent.add(name);
@@ -205,18 +232,21 @@ public class SyntaxAnalyzer{
                 if ( T.type.equals("IDF") )
                 {
                     System.out.println("Cannot inherit from an identifier!");
+                    Semantic = true;
                     return false;
                 }
                 // If function
                 else if ( T.type.equals("Function") )
                 {
                     System.out.println("Cannot inherit from a Function!");
+                    Semantic = true;
                     return false;
                 }
                 // If final class
                 else if ( T.type.equals("Class") && T.CM.equals("const"))
                 {
                     System.out.println("Final class cannot be inherited!");
+                    Semantic = true;
                     return false;
                 }
                 parent.add(name);
@@ -235,19 +265,19 @@ public class SyntaxAnalyzer{
     }
 
     // Class Body
-    public boolean C_Body(ArrayList<ClassTable> CT){
+    public boolean C_Body(){
         // Rule 1
         if ( tokens.get(index).CP.equals("func") ){
-            if (C_Func(CT)){
-                if ( C_Body(CT) ) {
+            if (C_Func()){
+                if ( C_Body() ) {
                     return true;
                 }
             }
         }
         // Rule 2
         else if ( tokens.get(index).CP.equals("AM") ){
-            if (ATR(CT)){
-                if ( C_Body(CT) ){
+            if (ATR()){
+                if ( C_Body() ){
                     return true;
                 }
             }
@@ -326,6 +356,7 @@ public class SyntaxAnalyzer{
         // Rule 2
         else if ( tokens.get(index).CP.equals("abstract") )
         {
+            ABS = true;
             index++;
             if ( More() )
             {
@@ -360,6 +391,7 @@ public class SyntaxAnalyzer{
     public boolean T() {
         // Rule 1
         if (tokens.get(index).CP.equals("static")){
+            Static = true;
             index++;
             if ( T1() ){
                 return true;
@@ -367,6 +399,7 @@ public class SyntaxAnalyzer{
         }
         // Rule 2
         else if (tokens.get(index).CP.equals("const")){
+            Final = true;
             index++;
             if ( T2() ){
                 return true;
@@ -380,6 +413,7 @@ public class SyntaxAnalyzer{
         // Rule 1
         if (tokens.get(index).CP.equals("const"))
         {
+            Final = true;
             index++;
             return true;
         }
@@ -396,6 +430,7 @@ public class SyntaxAnalyzer{
         // Rule 1
         if (tokens.get(index).CP.equals("static"))
         {
+            Static = true;
             index++;
             return true;
         }
@@ -409,15 +444,39 @@ public class SyntaxAnalyzer{
 
 
     // More
+    // Insertion in Class table for function
     public boolean More(){
         if ( tokens.get(index).CP.equals("ID") )
         {
+            // Name of function
+            name = tokens.get(index).value;
             index++;
-            if ( tokens.get(index).CP.equals("lp") )
+            if ( tokens.get(index).CP.equals("lp") ) 
             {
+                SMA.createScope(); // Class Function scope starts
+                String params = ""; // To store parametes' datatype, separated by ,
                 index++;
-                if ( Param() )
+                if ( Param(params) )
                 {
+                    // Add to Classtable
+                    // Look if duplicate entry
+                    if ( SMA.LookupCTf(name, params, Classname) == null )
+                    {
+                        ClassTable C = new ClassTable(name, params, AM, Final, Static, ABS);
+                        SMA.insertCT(C, Classname);
+                        name = null;
+                        AM = null;
+                        Final = false;
+                        Static = false;
+                        ABS = false;
+                    }
+                    else{
+                        // Duplication Error
+                        System.out.println("Duplicate Function "+ name);
+                        Semantic = true;
+                        return false;
+                    }
+                        
                     if ( tokens.get(index).CP.equals("rp") )
                     {
                         index++;
@@ -436,6 +495,7 @@ public class SyntaxAnalyzer{
             index++;
             if ( B() )
             {
+                SMA.destroyScope(); // Class Function scope closes
                 return true;
             }
         }   
@@ -453,10 +513,13 @@ public class SyntaxAnalyzer{
         else if ( tokens.get(index).CP.equals("semicolon") )
         {
             index++;
-            if ( tokens.get(index).CP.equals("rcb") )
+            if ( B2() )
             {
-                index++;
-                return true;
+                if ( tokens.get(index).CP.equals("rcb") )
+                {
+                    index++;
+                    return true;
+                }
             }
         }
         // MST }
@@ -479,12 +542,14 @@ public class SyntaxAnalyzer{
     }
     
     // Attributes
-    public boolean ATR(ArrayList<ClassTable> CT){
+    public boolean ATR(){
         if ( tokens.get(index).CP.equals("AM") )
         {
-            if ( AM() ){
-                if ( Type() ){
-                    if ( A() ){
+            if ( AM() ) // AM receives value of AM
+            {
+                if ( Type() ){ // type receives value of static or const
+                    if ( A() ){ // receives datatype and name
+                        // Insertion in classtable is handled in DEC
                         return true;
                     }
                 }
@@ -516,6 +581,7 @@ public class SyntaxAnalyzer{
     public boolean A(){
         if ( tokens.get(index).CP.equals("DT") )
         {
+            Class = true;
             if ( DEC() ){
                 return true;
             }
@@ -591,6 +657,7 @@ public class SyntaxAnalyzer{
     public boolean DEC(){
         // Terminal
         if ( tokens.get(index).CP.equals("DT") ){
+            DT = tokens.get(index).value; // DT of variable
             index++;
             if ( XO() ){
                 return true;
@@ -603,7 +670,41 @@ public class SyntaxAnalyzer{
     public boolean XO(){
         // Rule 1
         if ( tokens.get(index).CP.equals("ID") ){
+            name = tokens.get(index).value; // Name of variable
             index++;
+            // Insert in Classtable if Class flag is true else insert in Maintable
+            if (Class == true)
+            {
+                // Look if duplicate entry
+                if ( SMA.LookupCTa(name, Classname) == null )
+                {
+                    ClassTable C = new ClassTable(name, DT, AM, Final, Static, ABS);
+                    SMA.insertCT(C, Classname);
+                    name = null;
+                    DT = null;
+                    AM = null;
+                    Final = false;
+                    Static = false;
+                }
+                else{
+                    // Duplication Error
+                    System.out.println("Duplicate Identifier "+ name);
+                    Semantic = true; // Semantic error
+                    return false;
+                }
+            }
+            // Incase of Global declaration
+            if (Class == false && global) 
+            {
+                // Enter into Maintable
+                if ( ! SMA.insertMT(name, type, DT, CM, parent, Class) )
+                {
+                    // Duplication Error
+                    System.out.println("Duplicate Global Variable "+ name);
+                    Semantic = true;
+                    return false;
+                }
+            }
             if ( NEW() ){
                 return true;
             }
@@ -673,7 +774,20 @@ public class SyntaxAnalyzer{
         else if ( tokens.get(index).CP.equals("comma") ){
             index++;
             if ( tokens.get(index).CP.equals("ID") ){
+                // For multiple declaration
+                name = tokens.get(index).value;
                 index++;
+                // Insert in Classtable if flag is true else insert in Maintable
+                if (Class)
+                {
+                    // Look if duplicate entry
+                    if ( SMA.LookupCTa(name, Classname) != null )
+                    {
+                        ClassTable C = new ClassTable(name, DT, AM, Final, Static, ABS);
+                        SMA.insertCT(C, Classname);
+                    }
+                }
+                
                 if ( NEW() ){
                     return true;
                 }
@@ -1375,9 +1489,13 @@ public class SyntaxAnalyzer{
                 index++;
                 if ( OE() ){
                     if ( tokens.get(index).CP.equals("rp") ){
+                        global = false; // Local scope start
+                        SMA.createScope();
                         index++;
                         if ( Body() )
                         {
+                            global = true; // Local scope close
+                            SMA.destroyScope();
                             return true;
                         }
                     }
@@ -1397,8 +1515,12 @@ public class SyntaxAnalyzer{
                 index++;
                 if ( OE() ){
                     if ( tokens.get(index).CP.equals("rp") ){
+                        global = false; // Local scope start
+                        SMA.createScope(); 
                         index++;
                         if ( Body() ){
+                            global = true; // Local scope close
+                            SMA.destroyScope();
                             if (O_Else())
                             {
                                 return true;
@@ -1415,8 +1537,12 @@ public class SyntaxAnalyzer{
     public boolean O_Else(){
         if ( tokens.get(index).CP.equals("else") )
         {
+            global = false; // Local scope start
+            SMA.createScope();
             index++;
             if ( IF_BODY() ){
+                global = true; // Local scope close
+                SMA.destroyScope();
                 return true;
             }
         }
@@ -1471,8 +1597,9 @@ public class SyntaxAnalyzer{
         if ( tokens.get(index).CP.equals("for") )
         {
             index++;
-            if ( tokens.get(index).CP.equals("lp") )
+            if ( tokens.get(index).CP.equals("lp") ) // for scope starts here
             {
+                SMA.createScope();
                 index++;
                 if ( P1() ){
                     if(tokens.get(index).CP.equals("semicolon"))
@@ -1485,9 +1612,11 @@ public class SyntaxAnalyzer{
                                 if ( P3() ){
                                     if ( tokens.get(index).CP.equals("rp") )
                                     {
+
                                         index++;
                                         if ( Body() )
                                         {
+                                            SMA.destroyScope(); // For scope closes
                                             return true;
                                         }
                                     }
@@ -1696,7 +1825,15 @@ public class SyntaxAnalyzer{
     // -------------------------------------------------- Expression --------------------------------------------------------------
     // lp = (, rp = ), ^^ = logical not(LogNot) 
     // OE follow = ), ;, ], ,
-    // OE: param, any, if, while, for(p2, p3), dec(new2), arr(n1)=], asgn, 
+    // OE: param, any, if, while, for(p2, p3), dec(new2), arr(n1)=], asgn,
+    /* Compatibility Checks
+    L OR R: L = bool, R = bool
+    L AND R: L=R=bool
+    L +-*%/ R: L=R=int or float
+    L + R: L=R=string
+    L ROP R= bool
+    str  
+    */
     public boolean OE()
     {
         if ( tokens.get(index).CP.equals("int") || tokens.get(index).CP.equals("float") || tokens.get(index).CP.equals("str") || tokens.get(index).CP.equals("char") ||
@@ -2097,20 +2234,38 @@ public class SyntaxAnalyzer{
     {
         if ( tokens.get(index).CP.equals("func" ) )
         {
+            type = "Function"; // Entity type
             index++;
             if ( tokens.get(index).CP.equals("ID" ) )
             {
+                name = tokens.get(index).value; // Function name
                 index++;
-                if ( tokens.get(index).CP.equals("lp" ) )
+                if ( tokens.get(index).CP.equals("lp" ) ) // Function scope starts here
                 {
+                    SMA.createScope();
+                    function = true;
+                    String params = ""; // To store Parameters's types 
                     index++;
-                    if ( Param() )
+                    if ( Param(params) )
                     {
+                        // Insert into Main table
+                        // Check if duplicate
+                        if ( ! SMA.insertMT(name, type, params, CM, parent, Class) )
+                        {
+                            System.out.println("Duplicate Function Error");
+                            Semantic = true;
+                            return false;
+                        }
+                        name = null;
+                        type = null;
+                        CM = null;
                         if  ( tokens.get(index).CP.equals("rp" ) )
                         {
                             index++;
                             if ( Func_Body() )
                             {
+                                SMA.destroyScope(); // Function scope closes
+                                function = false;
                                 return true;
                             }
                         }
@@ -2122,12 +2277,14 @@ public class SyntaxAnalyzer{
     }
 
     // Parameters
-    public boolean Param()
+    public boolean Param(String params)
     {
         if ( tokens.get(index).CP.equals("DT" ) )
         {
+            DT = tokens.get(index).value; // DT of parameter
+            params = params + DT; // Add it to params list
             index++;
-            if ( P() )
+            if ( P(params) )
             {
                 return true;
             }
@@ -2145,13 +2302,13 @@ public class SyntaxAnalyzer{
     }
 
     // P
-    public boolean P()
+    public boolean P(String params)
     {
         // Rule 1
         if ( tokens.get(index).CP.equals("ID" ) )
         {
             index++;
-            if ( PL() )
+            if ( PL(params) )
             {
                 return true;
             }
@@ -2169,7 +2326,7 @@ public class SyntaxAnalyzer{
                     if (  tokens.get(index).CP.equals("ID" ) )
                     {
                         index++;
-                        if  (PL() )
+                        if  (PL(params) )
                         {
                              return true;
                         }
@@ -2213,7 +2370,7 @@ public class SyntaxAnalyzer{
     }
 
     // PL
-    public boolean PL()
+    public boolean PL(String params)
     {
         // Rule 2
         if ( tokens.get(index).CP.equals("comma" ) )
@@ -2221,8 +2378,10 @@ public class SyntaxAnalyzer{
             index++;
             if (  tokens.get(index).CP.equals("DT" )  )
             {
+                DT = tokens.get(index).value; // DT of parameter
+                params = params +","+ DT; // Add it to params list with ,
                 index++;
-                if ( PL1() )
+                if ( PL1(params) )
                 {
                     return true;
                 }
@@ -2241,13 +2400,13 @@ public class SyntaxAnalyzer{
     }
 
     // PL1 
-    public boolean PL1()
+    public boolean PL1(String params)
     {
         // Rule 1
         if ( tokens.get(index).CP.equals("ID" ) )
         {
             index++;
-            if ( PL() )
+            if ( PL(params) )
             {
                 return true;
             }
@@ -2265,7 +2424,7 @@ public class SyntaxAnalyzer{
                     if (  tokens.get(index).CP.equals("ID" ) )
                     {
                         index++;
-                        if  (PL() )
+                        if  (PL(params) )
                         {
                              return true;
                         }
@@ -2760,13 +2919,314 @@ public class SyntaxAnalyzer{
     }
     // Pre Increment
     public boolean PRE_INC(){
-        if (tokens.get(index).CP.equals("IncDec")){
+        if (tokens.get(index).CP.equals("IncDec"))
+        {
             index++;
             if ( tokens.get(index).CP.equals("ID") ){
+                name = tokens.get(index).value;
+                // Check if Variable is declared in Scope stack
+                // Check in Local table
+                int stackInd = SMA.currentscope.size()-1;
+                String local = null;
+                while (stackInd >= 0)
+                {
+                    local = SMA.lookupLT(name, SMA.currentscope.get(stackInd));
+                    if ( local.equals(null) )
+                    {
+                        // Check in the upper scope
+                        stackInd--;
+                    }
+                    else
+                    {
+                        if ( ! (local.equals("int") || local.equals("float")) )
+                        {
+                            // typemistach error
+                            System.out.println("Cannot apply pre-increment operator on type: " + local);
+                            Semantic = true;
+                            return false;
+                        }
+                        break;
+                    }
+                }
+                // Check in MT
+                if ( local.equals(null) )
+                {
+                    MainTable var = SMA.lookupMT(name);
+                    if ( var != null )
+                    {
+                        if ( ! (var.DT.equals("int") || var.DT.equals("float")) )
+                        {
+                            // typemistach error
+                            System.out.println("Cannot apply pre-increment operator on type: " + var.DT);
+                            Semantic = true;
+                            return false;
+                        }
+                    }
+                    // Varible Undefined
+                    else
+                    {
+                        System.out.println("Variable "+ name + " is undefined");
+                        Semantic = true;
+                        return false;
+                    }
+                }
                 index++;
                 return true;
             }
         }
         return false;
     }
+
+    //--------------------- General expression without ID------------------------------------------------
+    /* 
+    public boolean OE()
+    {
+        if ( tokens.get(index).CP.equals("int") || tokens.get(index).CP.equals("float") || tokens.get(index).CP.equals("str") || tokens.get(index).CP.equals("char") ||
+            tokens.get(index).CP.equals("bool") || tokens.get(index).CP.equals("ID") || tokens.get(index).CP.equals("lp") || tokens.get(index).CP.equals("LogNot")
+        )
+        {
+            if (AE())
+            {
+                if ( OE1() )
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    // OE1
+    public boolean OE1()
+    {
+        // Rule 1
+        if ( tokens.get(index).CP.equals("AndOR") )
+        {
+            index++;
+            if ( AE() )
+            {
+                if ( OE1() )
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Null
+        else {
+            // Follow set of OE1 = F(OE)
+            if ( tokens.get(index).CP.equals("rp") || tokens.get(index).CP.equals("comma") || 
+                tokens.get(index).CP.equals("semicolon") || tokens.get(index).CP.equals("]")
+                )
+            {
+                return true;
+            }
+        }
+        return false;            
+    }
+
+    // AE
+    public boolean AE()
+    {
+        if ( tokens.get(index).CP.equals("int") || tokens.get(index).CP.equals("float") || tokens.get(index).CP.equals("str") || tokens.get(index).CP.equals("char") ||
+        tokens.get(index).CP.equals("bool") || tokens.get(index).CP.equals("ID") || tokens.get(index).CP.equals("lp") || tokens.get(index).CP.equals("LogNot") )
+        {
+            if ( RE() )
+            {
+                if ( AE1() )
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // AE1
+    public boolean AE1()
+    {
+        // Rule 1
+        if ( tokens.get(index).CP.equals("AndOR") )
+        {
+            index++;
+            if ( RE() )
+            {
+                if ( AE1() )
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Null
+        else {
+            // Follow set of OE plus remaining operators
+            if ( tokens.get(index).CP.equals("rp") || tokens.get(index).CP.equals("comma") || 
+                tokens.get(index).CP.equals("semicolon") || tokens.get(index).CP.equals("]") || 
+                tokens.get(index).CP.equals("AndOR")
+                )
+            {
+                return true;
+            }
+        }
+        return false;            
+    }
+
+    // RE
+    public boolean RE()
+    {
+        if ( tokens.get(index).CP.equals("int") || tokens.get(index).CP.equals("float") || tokens.get(index).CP.equals("str") || tokens.get(index).CP.equals("char") ||
+        tokens.get(index).CP.equals("bool") || tokens.get(index).CP.equals("ID") || tokens.get(index).CP.equals("lp") || tokens.get(index).CP.equals("LogNot") )
+        {
+            if ( E() )
+            {
+                if ( RE1() )
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // RE1
+    public boolean RE1()
+    {
+        // Rule 1
+        if ( tokens.get(index).CP.equals("ROP") )
+        {
+            index++;
+            if ( E() )
+            {
+                if ( RE1() )
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Null
+        else {
+            // Follow set of OE
+            if ( tokens.get(index).CP.equals("rp") || tokens.get(index).CP.equals("comma") || 
+                tokens.get(index).CP.equals("semicolon") || tokens.get(index).CP.equals("]") ||
+                tokens.get(index).CP.equals("AndOR")
+                )
+            {
+                return true;
+            }
+        }
+        return false;            
+    }
+
+    // E
+    public boolean E()
+    {
+        if ( tokens.get(index).CP.equals("int") || tokens.get(index).CP.equals("float") || tokens.get(index).CP.equals("str") || tokens.get(index).CP.equals("char") ||
+        tokens.get(index).CP.equals("bool") || tokens.get(index).CP.equals("ID") || tokens.get(index).CP.equals("lp") || tokens.get(index).CP.equals("LogNot") )
+        {
+            if ( TF() )
+            {
+                if ( E1() )
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // E1
+    public boolean E1()
+    {
+        // Rule 1
+        if ( tokens.get(index).CP.equals("PM") )
+        {
+            index++;
+            if ( TF() )
+            {
+                if ( E1() )
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Null
+        else {
+            // Follow set of OE plus remaining operators
+            if (tokens.get(index).CP.equals("rp") || tokens.get(index).CP.equals("comma") || 
+                tokens.get(index).CP.equals("semicolon") || tokens.get(index).CP.equals("]") ||
+                tokens.get(index).CP.equals("ROP") || tokens.get(index).CP.equals("AndOR") 
+                )
+            {
+                return true;
+            }
+        }
+        return false;            
+    }
+
+    // T
+    public boolean TF()
+    {
+        if ( tokens.get(index).CP.equals("int") || tokens.get(index).CP.equals("float") || tokens.get(index).CP.equals("str") || 
+            tokens.get(index).CP.equals("char") || tokens.get(index).CP.equals("bool") || tokens.get(index).CP.equals("ID") || 
+            tokens.get(index).CP.equals("lp") || tokens.get(index).CP.equals("LogNot")
+            )
+        {
+            if ( F() )
+            {
+                if ( TF1() )
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // T1
+    public boolean TF1()
+    {
+        // Rule 1
+        if ( tokens.get(index).CP.equals("MDM") )
+        {
+            index++;
+            if ( F() )
+            {
+                if ( TF1() )
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Null
+        else {
+            // Follow set of OE
+            if (tokens.get(index).CP.equals("rp") || tokens.get(index).CP.equals("comma") || 
+                tokens.get(index).CP.equals("semicolon") || tokens.get(index).CP.equals("]") ||
+                tokens.get(index).CP.equals("ROP") || tokens.get(index).CP.equals("PM") || 
+                tokens.get(index).CP.equals("AndOR") )
+            {
+                return true;
+            }
+        }
+        return false;            
+    }
+
+    // F
+    public boolean F()
+    {
+        // Rule 0
+        if ( tokens.get(index).CP.equals("int") || tokens.get(index).CP.equals("float") || tokens.get(index).CP.equals("str") || tokens.get(index).CP.equals("char") ||
+        tokens.get(index).CP.equals("bool") )
+        {
+            if ( CONST() )
+            {
+                return true;
+            }
+        }
+    }
+    */
 }

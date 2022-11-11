@@ -1,2 +1,54 @@
 iterate (int a, b ~ 0; a < 5 & b < 6; a++, b++)
 {}
+
+
+When declarations are local then global flag is false
+Check in current scope if not then MT or check in CT if Class flag is true
+if (Global or local scope or CT){1
+    while (){2
+        if (){3
+            for (){4
+
+            }
+            if (){5
+
+            }
+        }
+    }
+}
+
+When declarations are in function then function flag is true ohterwise false
+Check in current scope if not then MT
+func a(){6
+    if (){7
+        while (){8
+            if (){9
+                for (){10
+
+                }
+                if (){11
+
+                }
+            }
+        }
+    }
+}
+
+class A{12
+
+    func A(){13
+        if (){14
+
+        }
+    }
+
+    func B(){15
+
+    }
+
+    func D(){16
+
+    }
+
+}
+
