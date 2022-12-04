@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.Stack;
 
+
 public class SemanticAnalyzer {
 
     SemanticAnalyzer(){};
@@ -144,7 +145,6 @@ public class SemanticAnalyzer {
 
     boolean insertFT(String name, String type, int scope)
     {
-    
             for (FunctionTable item : FT) {
                 if (item.name.equals(name) && item.scope == scope) {
                     return false;
@@ -171,8 +171,8 @@ public class SemanticAnalyzer {
 
     boolean insertLT(String name, String type, int scope)
     {
-    
-            for (LocalTable item : LT) {
+            for (LocalTable item : LT) 
+            {
                 if (item.name.equals(name) && item.scope == scope) {
                     return false;
                 }
@@ -207,28 +207,51 @@ public class SemanticAnalyzer {
         currentscope.pop();
     }
 
-    // Compatibility check
+    // Compatibility check Arithmetic
     /*  Cases: 
     1. int + int = int
     2. int + float = float
     3. float + int = float
     4. float + float = float
+    5. str + str = str
+    6. str + char = str
+    7. int + char = int
+    8. char + char = int
     */
-    public String compatibilityCheck(String leftType, String rightType, String operator) 
+    public String compatibilityArithmetic(String leftType, String rightType, String operator) 
     {
-        if (operator.equals("+") || operator.equals("-") || operator.equals("*") || operator.equals("/") || operator.equals("%")) {
-            
+        String type = null;
+        if (operator.equals("+") || operator.equals("-") || operator.equals("*") || operator.equals("/") || operator.equals("%")) 
+        {    
             // String compatibility
-            if ( operator.equals("+") && leftType.equals("str") && rightType.equals("str") )
+            if ( operator.equals("+") )
             {
-                String type = "str";
-                return type;
+                // str + str = str or str + char = str
+                if ( leftType.equals("str") && rightType.equals("str") ||
+                    leftType.equals("str") && rightType.equals("char") || 
+                    leftType.equals("char") && rightType.equals("str") ||  
+                    leftType.equals("char") && rightType.equals("char")
+                    )
+                {
+                    type = "str";
+                    return type;
+                }
+
+                // int + char = int
+                else if (leftType.equals("int") && rightType.equals("char") || 
+                        leftType.equals("char") && rightType.equals("int") ||
+                        leftType.equals("char") && rightType.equals("char")
+                        )
+                {
+                    type = "int";
+                    return type;
+                }
             }
 
-            // case 1
+            // case real numbers
             if (leftType.equals("int") && rightType.equals("int")) 
             {
-                String type = "int";
+                type = "int";
                 return type;
             }
 
@@ -236,13 +259,55 @@ public class SemanticAnalyzer {
                     leftType.equals("float") && rightType.equals("int") ||
                     leftType.equals("float") && rightType.equals("float") )
             {
-                String type = "float";
+                type = "float";
                 return type;            
             }
         }
-        return null;
+        return type;
     }
 
+    // Compatibility for Relational operators
+    public String compatibilityRelational(String leftType, String rightType, String operator)
+    {
+        String type = null;
+        if ( operator.equals("==") || operator.equals(">=") ||
+            operator.equals("<=") || operator.equals("<") ||
+            operator.equals(">") || operator.equals("<>") )
+        {
+            // L ROP R= bool
+            if ( leftType.equals("int") && rightType.equals("int") ||
+                leftType.equals("int") && rightType.equals("float") ||
+                leftType.equals("float") && rightType.equals("int") ||
+                leftType.equals("float") && rightType.equals("float")||
+                leftType.equals("char") && rightType.equals("char") ||
+                leftType.equals("str") && rightType.equals("str") ||
+                leftType.equals("char") && rightType.equals("int") ||
+                leftType.equals("int") && rightType.equals("char") ||
+                leftType.equals("char") && rightType.equals("float") ||
+                leftType.equals("float") && rightType.equals("char")
+                )
+            {   
+                type = "bool";
+                return type;
+            }
+        }
+        return type;
+    }
+
+    // Compatibility for Logical operators
+    public String compatibilityLogical(String leftType, String rightType, String operator)
+    {
+        String type = null;
+        if ( operator.equals("|") || operator.equals("&") )
+        {
+            if ( leftType.equals("bool") && rightType.equals("bool") )
+            {
+                type = "bool";
+                return type;
+            }
+        }
+        return type;
+    }
 }
 
 class MainTable
@@ -268,11 +333,6 @@ class MainTable
             this.CT = new ArrayList<ClassTable>();
         }
     }
-
-    // For Variables
-
-    // For function
-
 
 }
 

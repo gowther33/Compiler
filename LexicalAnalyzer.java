@@ -95,7 +95,7 @@ public class LexicalAnalyzer {
 		// boolean flag = false;
 		String [][] RE = {{"[+|-]?[0-9]*[.][0-9]+","float"},{"[+-]?[0-9]+","int"},{"true|false","bool"},
 				{"\"(.|\\w)*\"","str"},
-				{"\'[\\[\r|\n|\'|\"|\b|\t|\f]]|[a-zA-Z]|[0-9]|[`|~|!|@|#|$|%|^|&|*|(|)|_|_|+|=|{|}|\\[|\\]|<|>|?|.|,]\'","char"}};
+				{"\'(.|\\w)*\'","char"}};
 		for(int i=0;i<RE.length;i++) {
 			boolean bool = true;
 			boolean bool1 = true;

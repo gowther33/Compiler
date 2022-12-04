@@ -6,6 +6,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "Launch LexicalAnalyzer",
+            "request": "launch",
+            "mainClass": "LexicalAnalyzer",
+            "projectName": "Compiler Work_c5a8019"
+        },
+        {
+            "type": "java",
             "name": "Launch SyntaxAnalyzer",
             "request": "launch",
             "mainClass": "SyntaxAnalyzer",
